@@ -38,15 +38,15 @@ namespace LazyProxy
             params InjectionMember[] injectionMembers)
             where TTo : TFrom
         {
-            return container.RegisterType(
-                typeof(TFrom),
-                LazyProxyGenerator.GetLazyProxyType<TFrom, TTo>(),
-                name, lifetimeManager, injectionMembers);
-            //return
-            //    container.RegisterType<TFrom>(
-            //        new InjectionFactory(
-            //            c => LazyProxyGenerator.CreateProxy<TFrom, TTo>(
-            //                c.Resolve<Lazy<TTo>>())));
+            //return container.RegisterType(
+            //    typeof(TFrom),
+            //    LazyProxyGenerator.GetLazyProxyType<TFrom, TTo>(),
+            //    name, lifetimeManager, injectionMembers);
+            return
+                container.RegisterType<TFrom>(
+                    new InjectionFactory(
+                        c => LazyProxyGenerator.CreateProxy<TFrom, TTo>(
+                            c.Resolve<Lazy<TTo>>())));
         }
     }
 }
