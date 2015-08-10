@@ -1,4 +1,5 @@
-﻿using Microsoft.Practices.Unity;
+﻿using System;
+using Microsoft.Practices.Unity;
 
 namespace LazyProxy
 {
@@ -7,6 +8,7 @@ namespace LazyProxy
         public static IUnityContainer RegisterLazy<TFrom, TTo>(
             this IUnityContainer container,
             params InjectionMember[] injectionMembers)
+            where TTo : TFrom
         {
             return container.RegisterLazy<TFrom, TTo>(null, new TransientLifetimeManager(), injectionMembers);
         }
@@ -15,6 +17,7 @@ namespace LazyProxy
             this IUnityContainer container,
             LifetimeManager lifetimeManager,
             params InjectionMember[] injectionMembers)
+            where TTo : TFrom
         {
             return container.RegisterLazy<TFrom, TTo>(null, lifetimeManager, injectionMembers);
         }
@@ -23,6 +26,7 @@ namespace LazyProxy
             this IUnityContainer container,
             string name,
             params InjectionMember[] injectionMembers)
+            where TTo : TFrom
         {
             return container.RegisterLazy<TFrom, TTo>(name, new TransientLifetimeManager(), injectionMembers);
         }
@@ -32,11 +36,17 @@ namespace LazyProxy
             string name,
             LifetimeManager lifetimeManager,
             params InjectionMember[] injectionMembers)
+            where TTo : TFrom
         {
             return container.RegisterType(
                 typeof(TFrom),
                 LazyProxyGenerator.GetLazyProxyType<TFrom, TTo>(),
                 name, lifetimeManager, injectionMembers);
+            //return
+            //    container.RegisterType<TFrom>(
+            //        new InjectionFactory(
+            //            c => LazyProxyGenerator.CreateProxy<TFrom, TTo>(
+            //                c.Resolve<Lazy<TTo>>())));
         }
     }
 }

@@ -1,7 +1,7 @@
 ﻿using System;
+using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
-using FluentIL;
 
 namespace LazyProxy
 {
@@ -10,6 +10,12 @@ namespace LazyProxy
         public static Type GetLazyProxyType<TFrom, TTo>()
         {
             return TypeCache<TFrom, TTo>.LazyProxyType;
+        }
+
+        public static TFrom CreateProxy<TFrom, TTo>(Lazy<TTo> lazy)
+            where TTo : TFrom
+        {
+            return TypeCache<TFrom, TTo>.LazyProxyConstructorDelegate(lazy);
         }
 
         #region Lazy proxy type generation
@@ -26,10 +32,16 @@ namespace LazyProxy
         {
             // ReSharper disable once StaticMemberInGenericType (intentional)
             internal static readonly Type LazyProxyType;
+            internal static readonly Func<Lazy<TTo>, TFrom> LazyProxyConstructorDelegate;
 
             static TypeCache()
             {
                 LazyProxyType = TypeCache<TFrom>.OpenLazyProxyType.MakeGenericType(typeof(TTo));
+                var ctor = LazyProxyType.GetConstructor(new[] {typeof (Lazy<TTo>)});
+                var arg = Expression.Parameter(typeof (Lazy<TTo>), "lazy");
+                // ReSharper disable once AssignNullToNotNullAttribute
+                var expr = Expression.Lambda<Func<Lazy<TTo>, TFrom>>(Expression.New(ctor, arg), arg);
+                LazyProxyConstructorDelegate = expr.Compile();
             }
         }
 
@@ -80,10 +92,13 @@ namespace LazyProxy
                 MethodAttributes.Public,
                 CallingConventions.Standard,
                 new[] { lazyField.FieldType });
-            ctor.GetILGenerator().Fluent()
-                .Ldarg_0().Call(typeof(object).GetConstructor(Type.EmptyTypes)) // : base()
-                .Ldarg_0().Ldarg_1().Stfld(lazyField) // this._lazy = lazy
-                .Ret();
+            var il = ctor.GetILGenerator();
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Call, typeof(object).GetConstructor(Type.EmptyTypes));
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldarg_1);
+            il.Emit(OpCodes.Stfld, lazyField);
+            il.Emit(OpCodes.Ret);
         }
 
         private static void CreateMethod(TypeBuilder typeBuilder, MethodInfo targetMethod, FieldBuilder lazyField, MethodInfo lazyValueGetter)
@@ -95,15 +110,17 @@ namespace LazyProxy
                 MethodAttributes.Public | MethodAttributes.Final | MethodAttributes.Virtual,
                 targetMethod.ReturnType,
                 paramTypes);
-            var il = method.GetILGenerator().Fluent();
-            il.Ldarg_0().Ldfld(lazyField) // this._lazy
-              .Callvirt(lazyValueGetter); // .Value
-            for (uint i = 0; i < parameters.Length; i++)
+            
+            var il = method.GetILGenerator();
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Ldfld, lazyField);
+            il.Emit(OpCodes.Callvirt, lazyValueGetter);
+            for (short i = 1; i <= parameters.Length; i++)
             {
-                il.Ldarg(i);
+                il.Emit(OpCodes.Ldarg, i);
             }
-            il.Callvirt(targetMethod);
-            il.Ret();
+            il.Emit(OpCodes.Callvirt, targetMethod);
+            il.Emit(OpCodes.Ret);
         }
 
         #endregion

@@ -15,15 +15,6 @@ namespace LazyProxy
             var foo = container.Resolve<IFoo>();
             foo.Test();
         }
-
-        static void Test(ParameterInfo parameter)
-        {
-            var attributes = parameter.GetCustomAttributes(false);
-            if (attributes != null)
-            {
-                
-            }
-        }
     }
 
 
