@@ -75,9 +75,13 @@ namespace LazyProxy
                 switch (member.MemberType)
                 {
                     case MemberTypes.Method:
-                        CreateMethod(type, (MethodInfo)member, lazyField, lazyValueGetter);
+                        var method = (MethodInfo) member;
+                        if (method.IsSpecialName)
+                            continue;
+                        CreateMethod(type, method, lazyField, lazyValueGetter);
                         break;
                     case MemberTypes.Property:
+                        CreateProperty(type, (PropertyInfo) member, lazyField, lazyValueGetter);
                         break;
                     case MemberTypes.Event:
                         break;
@@ -92,8 +96,10 @@ namespace LazyProxy
                 MethodAttributes.Public,
                 CallingConventions.Standard,
                 new[] { lazyField.FieldType });
+            ctor.DefineParameter(1, ParameterAttributes.None, "lazy");
             var il = ctor.GetILGenerator();
             il.Emit(OpCodes.Ldarg_0);
+            // ReSharper disable once AssignNullToNotNullAttribute (I know this ctor exists...)
             il.Emit(OpCodes.Call, typeof(object).GetConstructor(Type.EmptyTypes));
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldarg_1);
@@ -101,16 +107,20 @@ namespace LazyProxy
             il.Emit(OpCodes.Ret);
         }
 
-        private static void CreateMethod(TypeBuilder typeBuilder, MethodInfo targetMethod, FieldBuilder lazyField, MethodInfo lazyValueGetter)
+        private static MethodBuilder CreateMethod(TypeBuilder typeBuilder, MethodInfo targetMethod, FieldBuilder lazyField, MethodInfo lazyValueGetter)
         {
             var parameters = targetMethod.GetParameters();
             var paramTypes = Array.ConvertAll(parameters, p => p.ParameterType);
             var method = typeBuilder.DefineMethod(
                 targetMethod.Name,
-                MethodAttributes.Public | MethodAttributes.Final | MethodAttributes.Virtual,
+                (targetMethod.Attributes | MethodAttributes.Final) & ~MethodAttributes.Abstract,
                 targetMethod.ReturnType,
                 paramTypes);
-            
+            foreach(var param in parameters)
+            {
+                method.DefineParameter(param.Position + 1, param.Attributes, param.Name);
+            }
+
             var il = method.GetILGenerator();
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldfld, lazyField);
@@ -121,7 +131,33 @@ namespace LazyProxy
             }
             il.Emit(OpCodes.Callvirt, targetMethod);
             il.Emit(OpCodes.Ret);
+            return method;
         }
+
+        private static PropertyBuilder CreateProperty(TypeBuilder typeBuilder, PropertyInfo targetProperty, FieldBuilder lazyField, MethodInfo lazyValueGetter)
+        {
+            var parameters = targetProperty.GetIndexParameters();
+            var paramTypes = Array.ConvertAll(parameters, p => p.ParameterType);
+            var property = typeBuilder.DefineProperty(
+                targetProperty.Name,
+                targetProperty.Attributes,
+                targetProperty.PropertyType,
+                paramTypes);
+
+            if (targetProperty.CanRead)
+            {
+                var getter = CreateMethod(typeBuilder, targetProperty.GetMethod, lazyField, lazyValueGetter);
+                property.SetGetMethod(getter);
+            }
+            if (targetProperty.CanWrite)
+            {
+                var setter = CreateMethod(typeBuilder, targetProperty.SetMethod, lazyField, lazyValueGetter);
+                property.SetSetMethod(setter);
+            }
+            return property;
+        }
+
+
 
         #endregion
     }

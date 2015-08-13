@@ -1,12 +1,11 @@
 ﻿using System;
-using System.Reflection;
 using Microsoft.Practices.Unity;
 
 namespace LazyProxy
 {
     class Program
     {
-        static void Main(string[] args)
+        static void Main()
         {
             var container = new UnityContainer();
             container.RegisterType<IFoo, Foo>();
@@ -14,6 +13,7 @@ namespace LazyProxy
 
             var foo = container.Resolve<IFoo>();
             foo.Test();
+            Console.ReadLine();
         }
     }
 
@@ -26,6 +26,7 @@ namespace LazyProxy
     public interface IBar
     {
         string Baz();
+        int X { get; set; }
     }
 
     class Foo : IFoo
@@ -38,12 +39,16 @@ namespace LazyProxy
 
         public void Test()
         {
-            Console.WriteLine(_bar.Baz());
+            Console.WriteLine("Baz(): " + _bar.Baz());
+            Console.WriteLine("X:" + _bar.X);
+            Console.WriteLine("Setting X to 123");
+            _bar.X = 123;
         }
     }
 
     class Bar : IBar
     {
+        // ReSharper disable once UnusedParameter.Local
         public Bar(IFoo foo)
         {
         }
@@ -51,6 +56,21 @@ namespace LazyProxy
         public string Baz()
         {
             return "Hello world";
+        }
+
+        public int X
+        {
+            get
+            {
+                return 42;
+            }
+            set
+            {
+                if (value == 42)
+                    Console.WriteLine("OK!");
+                else
+                    Console.WriteLine("No, the answer is 42");
+            }
         }
     }
 
