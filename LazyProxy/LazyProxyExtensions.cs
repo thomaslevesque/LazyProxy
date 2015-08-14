@@ -2,7 +2,7 @@
 
 namespace LazyProxy
 {
-    static class LazyProxyExtensions
+    public static class LazyProxyExtensions
     {
         public static IUnityContainer RegisterLazy<TFrom, TTo>(
             this IUnityContainer container,
