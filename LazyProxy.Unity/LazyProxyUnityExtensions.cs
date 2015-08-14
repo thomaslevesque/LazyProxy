@@ -1,8 +1,8 @@
 ﻿using Microsoft.Practices.Unity;
 
-namespace LazyProxy
+namespace LazyProxy.Unity
 {
-    public static class LazyProxyExtensions
+    public static class LazyProxyUnityExtensions
     {
         public static IUnityContainer RegisterLazy<TFrom, TTo>(
             this IUnityContainer container,

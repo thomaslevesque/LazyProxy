@@ -5,6 +5,8 @@ VisualStudioVersion = 14.0.23107.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LazyProxy", "LazyProxy\LazyProxy.csproj", "{C4029A33-9878-40CF-AE0C-BAECAF6B24AE}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LazyProxy.Unity", "LazyProxy.Unity\LazyProxy.Unity.csproj", "{70E024D2-6C20-410F-BAD6-9CDB67A03D14}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{C4029A33-9878-40CF-AE0C-BAECAF6B24AE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C4029A33-9878-40CF-AE0C-BAECAF6B24AE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C4029A33-9878-40CF-AE0C-BAECAF6B24AE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{70E024D2-6C20-410F-BAD6-9CDB67A03D14}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{70E024D2-6C20-410F-BAD6-9CDB67A03D14}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{70E024D2-6C20-410F-BAD6-9CDB67A03D14}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{70E024D2-6C20-410F-BAD6-9CDB67A03D14}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
