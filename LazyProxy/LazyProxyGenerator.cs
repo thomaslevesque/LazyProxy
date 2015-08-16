@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -9,14 +10,77 @@ namespace LazyProxy
     {
         public static Type GetLazyProxyType<TFrom, TTo>()
         {
-            return TypeCache<TFrom, TTo>.LazyProxyType;
+            return GetLazyProxyType(typeof (TFrom), typeof (TTo));
+        }
+
+        public static Type GetLazyProxyType(Type fromType, Type toType)
+        {
+            var cache = GetCache(fromType, toType);
+            return cache.LazyProxyType;
         }
 
         public static TFrom CreateProxy<TFrom, TTo>(Lazy<TTo> lazy)
             where TTo : TFrom
         {
-            return TypeCache<TFrom, TTo>.LazyProxyConstructorDelegate(lazy);
+            return (TFrom) CreateProxy(typeof (TFrom), typeof (TTo), lazy);
         }
+
+        public static object CreateProxy(Type fromType, Type toType, object lazy)
+        {
+            var cache = GetCache(fromType, toType);
+            return cache.LazyProxyConstructorDelegate(lazy);
+        }
+
+        #region Cache
+
+        private static readonly ConcurrentDictionary<Type, OpenLazyProxyTypeCache> _lazyProxyTypeCache =
+            new ConcurrentDictionary<Type, OpenLazyProxyTypeCache>();
+
+        private class OpenLazyProxyTypeCache
+        {
+            private readonly ConcurrentDictionary<Type, LazyProxyTypeCache> _closedCache;
+            private readonly Type _openLazyProxyType;
+
+            public OpenLazyProxyTypeCache(Type fromType)
+            {
+                _closedCache = new ConcurrentDictionary<Type, LazyProxyTypeCache>();
+                _openLazyProxyType = CreateOpenLazyProxyType(fromType);
+            }
+
+            public LazyProxyTypeCache GetCache(Type toType)
+            {
+                return _closedCache.GetOrAdd(toType, t => new LazyProxyTypeCache(_openLazyProxyType, t));
+            }
+        }
+        private class LazyProxyTypeCache
+        {
+            public Type LazyProxyType { get; }
+            public Func<object, object> LazyProxyConstructorDelegate { get; }
+
+            public LazyProxyTypeCache(Type openLazyProxyType, Type toType)
+            {
+                LazyProxyType = openLazyProxyType.MakeGenericType(toType);
+                var lazyType = typeof (Lazy<>).MakeGenericType(toType);
+                var ctor = LazyProxyType.GetConstructor(new[] { lazyType });
+                var arg = Expression.Parameter(typeof(object), "lazy");
+                // ReSharper disable once AssignNullToNotNullAttribute
+                var expr = Expression.Lambda<Func<object, object>>(
+                    Expression.New(
+                        ctor,
+                        Expression.Convert(arg, lazyType)),
+                    arg);
+                LazyProxyConstructorDelegate = expr.Compile();
+            }
+        }
+
+        private static LazyProxyTypeCache GetCache(Type fromType, Type toType)
+        {
+            var openTypeCache = _lazyProxyTypeCache.GetOrAdd(fromType, t => new OpenLazyProxyTypeCache(t));
+            var cache = openTypeCache.GetCache(toType);
+            return cache;
+        }
+
+        #endregion
 
         #region Lazy proxy type generation
 
@@ -28,49 +92,21 @@ namespace LazyProxy
             _module = assembly.DefineDynamicModule("DynamicLazyProxies");
         }
 
-        static class TypeCache<TFrom, TTo>
+        private static Type CreateOpenLazyProxyType(Type fromType)
         {
-            // ReSharper disable once StaticMemberInGenericType (intentional)
-            internal static readonly Type LazyProxyType;
-            internal static readonly Func<Lazy<TTo>, TFrom> LazyProxyConstructorDelegate;
-
-            static TypeCache()
-            {
-                LazyProxyType = TypeCache<TFrom>.OpenLazyProxyType.MakeGenericType(typeof(TTo));
-                var ctor = LazyProxyType.GetConstructor(new[] {typeof (Lazy<TTo>)});
-                var arg = Expression.Parameter(typeof (Lazy<TTo>), "lazy");
-                // ReSharper disable once AssignNullToNotNullAttribute
-                var expr = Expression.Lambda<Func<Lazy<TTo>, TFrom>>(Expression.New(ctor, arg), arg);
-                LazyProxyConstructorDelegate = expr.Compile();
-            }
-        }
-
-        static class TypeCache<TFrom>
-        {
-            // ReSharper disable once StaticMemberInGenericType (intentional)
-            internal static readonly Type OpenLazyProxyType;
-
-            static TypeCache()
-            {
-                OpenLazyProxyType = CreateOpenLazyProxyType<TFrom>();
-            }
-        }
-
-        private static Type CreateOpenLazyProxyType<TFrom>()
-        {
-            string typeName = typeof(TFrom).FullName.Replace('.', '_') + "_LazyProxy";
+            string typeName = fromType.FullName.Replace('.', '_') + "_LazyProxy";
             var type = _module.DefineType(typeName);
-            type.AddInterfaceImplementation(typeof(TFrom));
+            type.AddInterfaceImplementation(fromType);
             var typeParams = type.DefineGenericParameters("TTo");
             var tto = typeParams[0];
-            tto.SetInterfaceConstraints(typeof(TFrom));
+            tto.SetInterfaceConstraints(fromType);
             var lazyType = typeof(Lazy<>).MakeGenericType(tto);
             var lazyField = type.DefineField("_lazy", lazyType, FieldAttributes.InitOnly | FieldAttributes.Private);
 
             CreateConstructor(type, lazyField);
 
-            var lazyValueGetter = typeof(Lazy<TFrom>).GetProperty("Value").GetGetMethod();
-            foreach (var member in typeof(TFrom).GetMembers())
+            var lazyValueGetter = typeof(Lazy<>).GetProperty("Value").GetGetMethod();
+            foreach (var member in fromType.GetMembers())
             {
                 switch (member.MemberType)
                 {
@@ -134,7 +170,7 @@ namespace LazyProxy
             return method;
         }
 
-        private static PropertyBuilder CreateProperty(TypeBuilder typeBuilder, PropertyInfo targetProperty, FieldBuilder lazyField, MethodInfo lazyValueGetter)
+        private static void CreateProperty(TypeBuilder typeBuilder, PropertyInfo targetProperty, FieldBuilder lazyField, MethodInfo lazyValueGetter)
         {
             var parameters = targetProperty.GetIndexParameters();
             var paramTypes = Array.ConvertAll(parameters, p => p.ParameterType);
@@ -154,7 +190,6 @@ namespace LazyProxy
                 var setter = CreateMethod(typeBuilder, targetProperty.SetMethod, lazyField, lazyValueGetter);
                 property.SetSetMethod(setter);
             }
-            return property;
         }
 
 

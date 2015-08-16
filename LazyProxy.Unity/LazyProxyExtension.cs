@@ -28,13 +28,9 @@ namespace LazyProxy.Unity
                     var policy = context.Policies.Get<ILazyProxyPolicy>(context.OriginalBuildKey);
                     if (policy != null)
                     {
-                        var createProxyMethod =
-                            typeof(LazyProxyGenerator)
-                                .GetMethod("CreateProxy")
-                                .MakeGenericMethod(policy.ServiceType, policy.ImplementationType);
                         var lazyType = typeof(Lazy<>).MakeGenericType(policy.ImplementationType);
                         var lazy = _container.Resolve(lazyType);
-                        var proxy = createProxyMethod.Invoke(null, new[] { lazy });
+                        var proxy = LazyProxyGenerator.CreateProxy(policy.ServiceType, policy.ImplementationType, lazy);
                         context.Existing = proxy;
                     }
                 }
