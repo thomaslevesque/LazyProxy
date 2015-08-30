@@ -2,6 +2,8 @@
 
 Dynamic lazy proxy to allow injection of circular dependencies, either with or without an IoC container.
 
+*Note: at this point, this library is just a POC, not production ready code. Only the most basic cases are covered. Things like events, generic methods, and ref/out parameters are not supported.*
+
 Assume you have two interfaces like this:
 
     public interface IFoo
