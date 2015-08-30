@@ -47,6 +47,7 @@
   <ItemGroup>
     <Compile Include="ILazyProxyPolicy.cs" />
     <Compile Include="InjectionLazyProxy.cs" />
+    <Compile Include="LazyProxyBuilderStrategy.cs" />
     <Compile Include="LazyProxyExtension.cs" />
     <Compile Include="LazyProxyPolicy.cs" />
     <Compile Include="LazyProxyUnityExtensions.cs" />
